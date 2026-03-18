@@ -13,16 +13,11 @@ st.set_page_config(
 # ── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Main background */
     .stApp { background-color: #0a0f1e; }
-    
-    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0d1526;
         border-right: 1px solid #1e3a5f;
     }
-    
-    /* Metric cards */
     [data-testid="stMetric"] {
         background-color: #0d1f3c;
         border: 1px solid #1e3a5f;
@@ -31,23 +26,36 @@ st.markdown("""
     }
     [data-testid="stMetricLabel"] { color: #7a9cc4 !important; font-size: 13px !important; }
     [data-testid="stMetricValue"] { color: #e8f4fd !important; font-size: 28px !important; font-weight: 700 !important; }
-    
-    /* Headers */
     h1 { color: #e8f4fd !important; font-size: 2rem !important; font-weight: 700 !important; }
     h2 { color: #e8f4fd !important; font-size: 1.3rem !important; }
     h3 { color: #7a9cc4 !important; font-size: 1rem !important; }
-    
-    /* Sidebar text */
-    .css-1d391kg, [data-testid="stSidebar"] * { color: #a8c5e0 !important; }
-    
-    /* Divider */
     hr { border-color: #1e3a5f !important; }
-
-    /* Caption */
     .stCaption { color: #4a7a9b !important; }
-
-    /* Radio buttons */
     .stRadio label { color: #a8c5e0 !important; }
+    .insight-box {
+        background-color: #0d1f3c;
+        border-left: 3px solid #1a6ab5;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin: 8px 0;
+        color: #a8c5e0;
+        font-size: 14px;
+    }
+    .info-box {
+        background-color: #0d1f3c;
+        border: 1px solid #1e3a5f;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+        color: #a8c5e0;
+    }
+    .calc-box {
+        background-color: #0d1f3c;
+        border: 1px solid #1a6ab5;
+        border-radius: 10px;
+        padding: 24px;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -89,7 +97,9 @@ with st.sidebar:
         "Portfolio Overview",
         "Vintage Analysis",
         "Stress Testing",
-        "Data Tables"
+        "ECL Calculator",
+        "Data Tables",
+        "About"
     ])
     st.markdown("---")
     st.markdown("**Dataset**")
@@ -97,7 +107,7 @@ with st.sidebar:
     st.markdown("**Framework**")
     st.markdown("IFRS 9 · Basel III")
 
-# ── PAGE 1 ────────────────────────────────────────────────
+# ── PAGE 1 — Portfolio Overview ───────────────────────────
 if page == "Portfolio Overview":
     st.markdown("# Portfolio Overview")
     st.caption("Expected Credit Loss analysis across 2.26 million Lending Club loans")
@@ -110,12 +120,23 @@ if page == "Portfolio Overview":
     col4.metric("Portfolio ECL %", f"{summary_df['Portfolio ECL %'][0]}%")
 
     st.markdown("---")
+
+    # Grade filter
+    st.markdown("### Filter by Loan Grade")
+    all_grades = ecl_df['grade'].tolist()
+    selected_grades = st.multiselect(
+        "Select grades to display",
+        options=all_grades,
+        default=all_grades
+    )
+    filtered_ecl = ecl_df[ecl_df['grade'].isin(selected_grades)]
+
     col5, col6 = st.columns(2)
 
     with col5:
         st.markdown("### ECL by Loan Grade")
         fig, ax = plt.subplots(figsize=(7, 4))
-        bars = ax.barh(ecl_df['grade'], ecl_df['total_ECL'] / 1e9,
+        bars = ax.barh(filtered_ecl['grade'], filtered_ecl['total_ECL'] / 1e9,
                        color='#1a6ab5', edgecolor='#2a8fd4', linewidth=0.5)
         ax.bar_label(bars, fmt='$%.2fB', padding=4, color='#a8c5e0', fontsize=10)
         ax.set_xlabel("ECL ($ Billions)")
@@ -128,8 +149,9 @@ if page == "Portfolio Overview":
         st.markdown("### Probability of Default by Grade")
         fig2, ax2 = plt.subplots(figsize=(7, 4))
         colors = ['#1a6ab5','#2080cc','#f0a500','#e07b00','#d94f3d','#b83228','#8b1a1a']
-        bars2 = ax2.bar(ecl_df['grade'], ecl_df['PD'], color=colors,
-                        edgecolor='#0a0f1e', linewidth=0.5)
+        grade_colors = [colors[all_grades.index(g)] for g in filtered_ecl['grade']]
+        bars2 = ax2.bar(filtered_ecl['grade'], filtered_ecl['PD'],
+                        color=grade_colors, edgecolor='#0a0f1e', linewidth=0.5)
         ax2.bar_label(bars2, fmt='%.1f%%', padding=3, color='#a8c5e0', fontsize=10)
         ax2.set_xlabel("Loan Grade")
         ax2.set_ylabel("PD (%)")
@@ -137,7 +159,31 @@ if page == "Portfolio Overview":
         fig2.tight_layout()
         st.pyplot(fig2)
 
-# ── PAGE 2 ────────────────────────────────────────────────
+    # Key insights
+    st.markdown("---")
+    st.markdown("## Key Insights")
+
+    highest_ecl_grade = ecl_df.loc[ecl_df['total_ECL'].idxmax(), 'grade']
+    highest_ecl_val = ecl_df['total_ECL'].max() / 1e9
+    riskiest_grade = ecl_df.loc[ecl_df['PD'].idxmax(), 'grade']
+    riskiest_pd = ecl_df['PD'].max()
+    safest_grade = ecl_df.loc[ecl_df['PD'].idxmin(), 'grade']
+    safest_pd = ecl_df['PD'].min()
+    highest_vintage = vintage_df.loc[vintage_df['default_rate'].idxmax(), 'issue_year']
+    highest_vintage_rate = vintage_df['default_rate'].max()
+
+    insights = [
+        f"📌 Grade {highest_ecl_grade} carries the highest total ECL at ${highest_ecl_val:.2f}B — not because it's the riskiest grade, but because it has the most loan volume.",
+        f"⚠️ Grade {riskiest_grade} has the highest default rate at {riskiest_pd:.1f}% — nearly 11x riskier than Grade {safest_grade} ({safest_pd:.1f}%).",
+        f"📉 The {int(highest_vintage)} vintage had the highest default rate at {highest_vintage_rate:.1f}% — loans issued during the financial crisis were hit hardest.",
+        "📊 LGD is above 96% across all grades — Lending Club's unsecured loans mean almost nothing is recovered after a default.",
+        "🔎 2017–2018 vintages show low default rates, but this is misleading — these loans haven't had enough time to mature and default yet."
+    ]
+
+    for insight in insights:
+        st.markdown(f'<div class="insight-box">{insight}</div>', unsafe_allow_html=True)
+
+# ── PAGE 2 — Vintage Analysis ─────────────────────────────
 elif page == "Vintage Analysis":
     st.markdown("# Vintage Analysis")
     st.caption("Performance of loan cohorts by origination year")
@@ -202,7 +248,7 @@ elif page == "Vintage Analysis":
         fig4.tight_layout()
         st.pyplot(fig4)
 
-# ── PAGE 3 ────────────────────────────────────────────────
+# ── PAGE 3 — Stress Testing ───────────────────────────────
 elif page == "Stress Testing":
     st.markdown("# Stress Testing")
     st.caption("Simulate the impact of increased default rates on portfolio ECL")
@@ -234,7 +280,8 @@ elif page == "Stress Testing":
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-    axes[0].bar(scenarios, ecl_vals, color=colors, edgecolor='#0a0f1e', linewidth=0.5, width=0.5)
+    axes[0].bar(scenarios, ecl_vals, color=colors,
+                edgecolor='#0a0f1e', linewidth=0.5, width=0.5)
     axes[0].set_title("ECL by Scenario ($B)", color='#e8f4fd', fontsize=13, pad=12)
     axes[0].set_ylabel("ECL ($ Billions)")
     axes[0].axhline(y=stressed_ecl, color='#00d4ff', linestyle='--',
@@ -257,7 +304,79 @@ elif page == "Stress Testing":
     fig.tight_layout()
     st.pyplot(fig)
 
-# ── PAGE 4 ────────────────────────────────────────────────
+# ── PAGE 4 — ECL Calculator ───────────────────────────────
+elif page == "ECL Calculator":
+    st.markdown("# ECL Calculator")
+    st.caption("Estimate the Expected Credit Loss for an individual loan")
+    st.markdown("---")
+
+    pd_map = {'A': 3.59, 'B': 8.66, 'C': 14.36, 'D': 20.35,
+              'E': 28.28, 'F': 36.42, 'G': 40.01}
+    lgd_map = {'A': 99.80, 'B': 99.48, 'C': 99.04, 'D': 98.53,
+               'E': 97.70, 'F': 96.75, 'G': 96.32}
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Loan Details")
+        loan_amount = st.number_input("Loan Amount ($)", min_value=500,
+                                      max_value=40000, value=15000, step=500)
+        grade = st.selectbox("Loan Grade", options=['A', 'B', 'C', 'D', 'E', 'F', 'G'])
+        term = st.radio("Loan Term", options=["36 months", "60 months"])
+        annual_income = st.number_input("Borrower Annual Income ($)",
+                                        min_value=10000, max_value=500000,
+                                        value=60000, step=5000)
+        dti = st.slider("Debt-to-Income Ratio (%)", 0.0, 50.0, 15.0, 0.5)
+
+    with col2:
+        st.markdown("### ECL Breakdown")
+
+        pd_val = pd_map[grade] / 100
+        lgd_val = lgd_map[grade] / 100
+        ead_val = loan_amount
+        ecl_val = pd_val * lgd_val * ead_val
+
+        term_multiplier = 1.15 if term == "60 months" else 1.0
+        dti_multiplier = 1.0 + (max(0, dti - 20) * 0.01)
+        adjusted_ecl = ecl_val * term_multiplier * dti_multiplier
+
+        st.markdown(f'<div class="calc-box">', unsafe_allow_html=True)
+        st.metric("Probability of Default (PD)", f"{pd_map[grade]}%")
+        st.metric("Loss Given Default (LGD)", f"{lgd_map[grade]}%")
+        st.metric("Exposure at Default (EAD)", f"${ead_val:,.0f}")
+        st.markdown("---")
+        st.metric("Base ECL (PD × LGD × EAD)", f"${ecl_val:,.2f}")
+        st.metric("Adjusted ECL (term + DTI factors)", f"${adjusted_ecl:,.2f}",
+                  f"{((adjusted_ecl/ecl_val)-1)*100:.1f}% adjustment" if adjusted_ecl != ecl_val else "No adjustment")
+        st.metric("ECL as % of Loan", f"{(adjusted_ecl/loan_amount)*100:.2f}%")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### Risk Assessment")
+
+    ecl_pct = (adjusted_ecl / loan_amount) * 100
+    if ecl_pct < 5:
+        risk_level = "🟢 Low Risk"
+        risk_color = "#2ecc71"
+        risk_note = "This loan falls within acceptable risk parameters."
+    elif ecl_pct < 15:
+        risk_level = "🟡 Moderate Risk"
+        risk_color = "#f0a500"
+        risk_note = "This loan carries moderate risk. Standard monitoring recommended."
+    elif ecl_pct < 25:
+        risk_level = "🟠 High Risk"
+        risk_color = "#e07b00"
+        risk_note = "This loan carries high risk. Enhanced due diligence recommended."
+    else:
+        risk_level = "🔴 Very High Risk"
+        risk_color = "#e05c5c"
+        risk_note = "This loan carries very high risk. Consider declining or requiring collateral."
+
+    st.markdown(f'<div class="insight-box" style="border-left-color: {risk_color}">'
+                f'<strong>{risk_level}</strong> — {risk_note}</div>',
+                unsafe_allow_html=True)
+
+# ── PAGE 5 — Data Tables ──────────────────────────────────
 elif page == "Data Tables":
     st.markdown("# Data Tables")
     st.markdown("---")
@@ -270,3 +389,69 @@ elif page == "Data Tables":
 
     st.markdown("### Stress Scenarios")
     st.dataframe(stress_df, use_container_width=True, hide_index=True)
+
+# ── PAGE 6 — About ────────────────────────────────────────
+elif page == "About":
+    st.markdown("# About This Project")
+    st.markdown("---")
+
+    st.markdown("""
+    <div class="info-box">
+    <h3 style="color:#a8c5e0">What is this?</h3>
+    <p>This is a credit risk analytics system built on the Lending Club loan dataset (2007–2018).
+    It analyzes 2.26 million real loans to estimate how much money a lender can expect to lose —
+    and which segments of the portfolio are the most dangerous.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("""
+        <div class="info-box">
+        <h3 style="color:#a8c5e0">PD — Probability of Default</h3>
+        <p>The likelihood that a borrower will stop repaying their loan.
+        Calculated from historical default rates grouped by loan grade.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class="info-box">
+        <h3 style="color:#a8c5e0">LGD — Loss Given Default</h3>
+        <p>The fraction of the outstanding amount that is unrecoverable after a default.
+        Since Lending Club loans are unsecured, LGD is above 96% across all grades.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("""
+        <div class="info-box">
+        <h3 style="color:#a8c5e0">EAD — Exposure at Default</h3>
+        <p>The outstanding loan balance at the time of default.
+        This is the amount the lender stands to lose before recoveries.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="info-box" style="margin-top:16px">
+    <h3 style="color:#a8c5e0">ECL = PD × LGD × EAD</h3>
+    <p>Expected Credit Loss is the core formula used by banks under <strong>IFRS 9</strong>
+    (International Financial Reporting Standard 9, in effect since January 2018).
+    It replaced the older IAS 39 standard and requires banks to provision for
+    expected losses proactively rather than waiting for losses to occur.</p>
+    <p style="margin-top:8px">This project also aligns with <strong>Basel III</strong> thinking around
+    capital adequacy, risk segmentation, and stress testing — the same framework
+    used by banks and NBFCs regulated by the RBI in India.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### Tools Used")
+    col4, col5, col6 = st.columns(3)
+    col4.markdown('<div class="info-box">🐍 Python<br>pandas, numpy, matplotlib</div>',
+                  unsafe_allow_html=True)
+    col5.markdown('<div class="info-box">🗄️ SQL<br>SQLite — 7 queries</div>',
+                  unsafe_allow_html=True)
+    col6.markdown('<div class="info-box">📊 Streamlit<br>This web app</div>',
+                  unsafe_allow_html=True)
