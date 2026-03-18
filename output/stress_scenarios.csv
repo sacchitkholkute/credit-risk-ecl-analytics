@@ -1,0 +1,6 @@
+Scenario,PD Multiplier,ECL ($B),ECL Increase ($B),ECL % of Portfolio
+Base Case,1.0,3.75,0.0,12.61
+Mild Stress,1.25,4.68,0.94,15.76
+Moderate Stress,1.5,5.62,1.87,18.92
+Severe Stress,2.0,7.49,3.75,25.22
+Extreme Stress,3.0,11.24,7.49,37.83
